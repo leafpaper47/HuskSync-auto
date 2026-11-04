@@ -79,7 +79,7 @@ jobs:
 
       - name: 更新滚动发布 "auto-build"
         if: github.ref == 'refs/heads/master'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: auto-build
           name: 自动构建（始终为最新 master）
