@@ -9,6 +9,11 @@ on:
   # 每天兜底构建一次（UTC 04:30 = 北京 12:30），防止上游没变动但想拿最新产物
   schedule:
     - cron: '30 4 * * *'
+  # 关键：用 GITHUB_TOKEN 推送的提交不会触发其他工作流的 push 事件，
+  # 所以同步工作流跑完后，这里用 workflow_run 接上，保证"同步完立刻构建"。
+  workflow_run:
+    workflows: [ "同步上游 (Sync upstream)" ]
+    types: [ completed ]
 
 permissions:
   contents: write
@@ -19,6 +24,8 @@ concurrency:
 
 jobs:
   build:
+    # 如果是被"同步上游"工作流触发的，只有同步成功时才继续构建
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
       - name: 检出代码

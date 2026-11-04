@@ -20,12 +20,14 @@
 | 结果 | 上游有更新 → 本仓库 `master` 多出一个 `chore: 同步上游 @<sha>` 提交 → 自动触发下面的构建 |
 
 > 为什么用 merge 而不是强制覆盖：强制 `reset` 会把本仓库新增的 `.github/workflows/*` 一起抹掉；merge 只在真有冲突时才会失败，失败时工作流会红叉报警，需要你手动处理。
+>
+> 另一个坑：**GitHub 用仓库自带的 `GITHUB_TOKEN` 推送的提交，不会触发 `push` 事件的其他工作流**（防止无限递归）。所以"同步完立即构建"是通过 `build.yml` 里的 `workflow_run` 触发器接上的，不依赖 push 事件。
 
 ### 2. `.github/workflows/build.yml` —— 自动构建
 
 | 项目 | 说明 |
 | --- | --- |
-| 触发 | `master` 分支 push（含上面同步产生的提交）、手动触发、每天 UTC 04:30（北京 12:30）兜底一次 |
+| 触发 | `master` 分支 push（你自己手动提交时）、**同步工作流跑完之后**（`workflow_run`）、手动触发、每天 UTC 04:30（北京 12:30）兜底一次 |
 | 环境 | Ubuntu + Temurin **JDK 25**（上游 `gradle.properties` 里 `javaVersion=25`）+ Gradle 缓存 |
 | 命令 | `./gradlew build -x test --no-daemon --stacktrace` |
 | 产物 | ① Actions 运行页面的 Artifacts：`HuskSync-build-<sha>`（保留 30 天）<br>② Releases 里滚动更新的 `auto-build` 预发布（每次都覆盖，永远是最新 master 的 jar） |
