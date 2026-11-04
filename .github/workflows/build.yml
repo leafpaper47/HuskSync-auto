@@ -70,7 +70,7 @@ jobs:
           fi
 
       - name: 上传构建产物（Actions 页面可下载）
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: HuskSync-build-${{ github.sha }}
           path: out/*.jar
