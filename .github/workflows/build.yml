@@ -40,7 +40,7 @@ jobs:
           java-version: '25'
 
       - name: 安装 Gradle 缓存
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
 
       - name: 编译（跳过测试，测试需要数据库环境）
         run: |
