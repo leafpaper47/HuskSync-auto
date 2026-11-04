@@ -1,0 +1,89 @@
+name: 构建 (Build)
+
+on:
+  # 每次 master 有新提交（包括上面 sync-upstream 同步进来的上游提交）就构建
+  push:
+    branches: [ master ]
+  # 支持手动触发
+  workflow_dispatch:
+  # 每天兜底构建一次（UTC 04:30 = 北京 12:30），防止上游没变动但想拿最新产物
+  schedule:
+    - cron: '30 4 * * *'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-master
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 安装 JDK 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '25'
+
+      - name: 安装 Gradle 缓存
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: 编译（跳过测试，测试需要数据库环境）
+        run: |
+          chmod +x gradlew
+          ./gradlew build -x test --no-daemon --stacktrace
+
+      - name: 收集产物
+        id: collect
+        run: |
+          set -e
+          mkdir -p out
+          # HuskSync 会把最终成品复制到 target/
+          if compgen -G "target/*.jar" > /dev/null; then
+            cp -v target/*.jar out/
+          fi
+          # 兜底：从各模块 build/libs 里捞主 jar（排除 sources/javadoc/dev）
+          find . -path '*/build/libs/*.jar' \
+               ! -name '*-sources.jar' ! -name '*-javadoc.jar' ! -name '*-dev.jar' \
+               -exec cp -v {} out/ \; || true
+          echo "=== 收集到的文件 ==="
+          ls -l out || true
+          COUNT=$(ls -1 out/*.jar 2>/dev/null | wc -l)
+          echo "count=$COUNT" >> "$GITHUB_OUTPUT"
+          if [ "$COUNT" -eq 0 ]; then
+            echo "::error::没有收集到任何 jar，构建脚本可能需要调整。"
+            exit 1
+          fi
+
+      - name: 上传构建产物（Actions 页面可下载）
+        uses: actions/upload-artifact@v4
+        with:
+          name: HuskSync-build-${{ github.sha }}
+          path: out/*.jar
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: 更新滚动发布 "auto-build"
+        if: github.ref == 'refs/heads/master'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: auto-build
+          name: 自动构建（始终为最新 master）
+          prerelease: true
+          make_latest: false
+          body: |
+            本发布由 GitHub Actions 自动更新，内容为当前 `master` 分支的构建产物。
+
+            - 提交：`${{ github.sha }}`
+            - 触发方式：${{ github.event_name }}
+            - 构建时间（UTC）：${{ github.run_started_at }}
+
+            > 该 tag 会被反复覆盖，请勿依赖其历史版本。
+          files: out/*.jar
