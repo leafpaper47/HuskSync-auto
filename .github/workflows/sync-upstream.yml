@@ -66,3 +66,5 @@ jobs:
       - name: 同步结果
         if: steps.merge.outputs.changed == 'true'
         run: echo "已同步上游 ${{ steps.merge.outputs.upstream_sha }}，构建 workflow 会自动开始。"
+
+# touch: 触发 GitHub 重新扫描注册
